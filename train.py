@@ -57,8 +57,7 @@ def process_sentence(lang_name, sentence):
         for p in punctuation:
             sentence = sentence.replace(p," "+p)
 
-        #return sentence
-        return "boop"
+        return sentence
 
 def compute_language(data, langs):
     lang1 = Language(langs[0])
