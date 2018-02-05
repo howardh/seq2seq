@@ -1,9 +1,8 @@
 from tqdm import tqdm
+import string
 import torch
 
 import tatoeba
-
-data = tatoeba.get_data()
 
 class Language:
     def __init__(self, name):
@@ -30,15 +29,36 @@ def process_sentence(lang_name, sentence):
     """
     Preprocess the sentence from the given language by:
     - Removing leading/trailing spaces
+    - Make everything lowercase
     - Removing invalid characters
     - Separating out punctuation
     - Splitting contractions
     """
     if lang_name == "eng":
-        # Find punctuations
-        punctuation = ['.',',','!','?']
+        # Remove leading/training spaces and change to lowercase
         sentence = sentence.lower().strip()
+        # Remove invalid characters
+        valid_chars = string.printable
+        sentence = ''.join((x for x in sentence if x in valid_chars))
+        # Find punctuations and separate them
+        punctuation = ['.',',','!','?']
+        for p in punctuation:
+            sentence = sentence.replace(p," "+p)
+        # Split contractions
+        sentence = sentence.replace("'"," ")
+
         return sentence
+
+    if lang_name == "fra":
+        # Remove leading/training spaces and change to lowercase
+        sentence = sentence.lower().strip()
+        # Find punctuations and separate them
+        punctuation = ['.',',','!','?']
+        for p in punctuation:
+            sentence = sentence.replace(p," "+p)
+
+        #return sentence
+        return "boop"
 
 def compute_language(data, langs):
     lang1 = Language(langs[0])
@@ -107,4 +127,7 @@ def sentence_to_variable(language, sentence):
     return [language.word2index[t] for t in tokens]
 
 if __name__=="__main__":
+    data = tatoeba.get_data()
+    data = [(process_sentence("eng",p0),process_sentence("fra",p1)) for p0,p1
+            in tqdm(data,"Preprocessing Sentences")]
     eng_lang, fra_lang = compute_language(data, ["eng","fra"])
