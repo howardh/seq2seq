@@ -9,7 +9,7 @@ from torch.autograd import Variable
 
 import tatoeba
 
-use_cuda = False
+use_cuda = True
 
 SOS = 0
 EOS = 1 
@@ -22,11 +22,11 @@ class Language:
         self.index2word = {SOS: "SOS", EOS: "EOS"}
         self.n_words = 2
 
-    def addSentence(self, sentence):
+    def add_sentence(self, sentence):
         for word in sentence.split(' '):
-            self.addWord(word)
+            self.add_word(word)
 
-    def addWord(self, word):
+    def add_word(self, word):
         if word not in self.word2index:
             self.word2index[word] = self.n_words
             self.word2count[word] = 1
@@ -78,8 +78,8 @@ def compute_language(data, langs):
     lang1 = Language(langs[0])
     lang2 = Language(langs[1])
     for pairs in tqdm(data,"Computing Language"):
-        lang1.addSentence(pairs[0])
-        lang2.addSentence(pairs[1])
+        lang1.add_sentence(pairs[0])
+        lang2.add_sentence(pairs[1])
     return lang1,lang2
 
 class EncoderRNN(torch.nn.Module):
@@ -141,7 +141,14 @@ def sentence_to_indices(language, sentence):
         tokens = sentence
     return [language.word2index[t] for t in tokens if t != ''] + [EOS]
 
-def sentence_to_variable(language, sentence, use_cuda=False):
+def indices_to_sentence(language, indices):
+    if indices[-1] == EOS:
+        indices = indices[:-1]
+    sentence = [language.index2word[i] for i in indices]
+    sentence = " ".join(sentence)
+    return sentence
+
+def sentence_to_variable(language, sentence):
     indices = sentence_to_indices(language, sentence)
     result = Variable(torch.LongTensor(indices).view(-1,1))
     if use_cuda:
@@ -260,10 +267,9 @@ def trainIters(encoder, decoder, train_data, test_data, input_lang, output_lang,
     decoder_optimizer = torch.optim.SGD(decoder.parameters(), lr=learning_rate)
     criterion = torch.nn.NLLLoss()
 
-    n_iters = 100
-    print_every = 10
-    plot_every = 10
-    for iter in range(1, n_iters + 1):
+    n_iters = 100000
+    print_every = 1000
+    for iter in tqdm(range(1, n_iters + 1),"Training"):
         training_pair = random.choice(train_data)
         input_variable = sentence_to_variable(input_lang, training_pair[0])
         target_variable = sentence_to_variable(output_lang, training_pair[1])
@@ -276,20 +282,20 @@ def trainIters(encoder, decoder, train_data, test_data, input_lang, output_lang,
             print_loss_avg = print_loss_total / print_every
             print_loss_total = 0
             test_loss = test_all(encoder,decoder,test_data,input_lang,output_lang,criterion)
-            print('%.4f\t %.4f' % (print_loss_avg, test_loss))
+            tqdm.write('%d\t Training error: %.4f\t Testing error: %.4f' % (iter, print_loss_avg, test_loss))
 
 def train_test_split(data, test_percent=0.1):
     test_size = int(len(data)*test_percent)
     test_indices = np.random.choice(range(len(data)), size=test_size, replace=False)
-    train = [data[i] for i in range(len(data)) if i not in test_indices]
-    test = [data[i] for i in range(len(data)) if i in test_indices]
+    train = [data[i] for i in tqdm(range(len(data)),"Creating training set") if i not in test_indices]
+    test = [data[i] for i in tqdm(range(len(data)),"Creating testing set") if i in test_indices]
     return train,test
 
 if __name__=="__main__":
-    data = tatoeba.get_data()[:100]
+    data = tatoeba.get_data()
     data = [(process_sentence("eng",p0),process_sentence("fra",p1)) for p0,p1
             in tqdm(data,"Preprocessing Sentences")]
-    train_data, test_data = train_test_split(data, 0.1)
+    train_data, test_data = train_test_split(data, 100/len(data))
     eng_lang, fra_lang = compute_language(data, ["eng","fra"])
 
     hidden_size = 256

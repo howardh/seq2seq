@@ -17,5 +17,15 @@ def test_process_sentence():
         yield nose.tools.eq_,expected,output,\
             'Input: "%s", Expected: "%s", Actual output: "%s"' % (sentence, expected, output)
 
+def test_sentence_to_indices():
+    sentences = ["", "a", "hello world !"]
+    lang = train.Language("eng")
+    for sentence in sentences:
+        lang.add_sentence(sentence)
+    for sentence in sentences:
+        indices = train.sentence_to_indices(lang, sentence)
+        sentence2 = train.indices_to_sentence(lang, indices)
+        yield nose.tools.eq_, sentence, sentence2
+
 if __name__ == '__main__':
     unittest.main()
