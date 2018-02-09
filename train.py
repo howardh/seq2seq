@@ -148,6 +148,40 @@ def indices_to_sentence(language, indices):
     sentence = " ".join(sentence)
     return sentence
 
+def translate_indices(encoder, decoder, indices):
+    # Encode input
+    encoder_hidden = encoder.init_hidden()
+    encoder_outputs = []
+    for index in indices:
+        index_var = Variable(torch.LongTensor([[index]]))
+        if use_cuda:
+            index_var = index_var.cuda()
+        encoder_output, encoder_hidden = encoder(index_var, encoder_hidden)
+        encoder_outputs.append(encoder_output[0][0])
+
+    # Decode
+    decoder_input = Variable(torch.LongTensor([[SOS]]))
+    decoder_input = decoder_input.cuda() if use_cuda else decoder_input
+
+    decoder_hidden = encoder_hidden
+    decoder_outputs = []
+    for di in range(100):
+        decoder_output, decoder_hidden = decoder(decoder_input, decoder_hidden)
+        topv, topi = decoder_output.data.topk(1)
+        ni = topi[0][0]
+
+        decoder_outputs.append(ni)
+        if ni == EOS:
+            break
+
+    return decoder_outputs
+
+def translate_sentence(encoder, decoder, input_lang, output_lang, sentence):
+    indices = sentence_to_indices(input_lang, sentence)
+    translated_indices = translate_indices(encoder, decoder, indices)
+    translated_sentence = indices_to_sentence(output_lang, translated_indices)
+    return translated_sentence
+
 def sentence_to_variable(language, sentence):
     indices = sentence_to_indices(language, sentence)
     result = Variable(torch.LongTensor(indices).view(-1,1))
@@ -257,7 +291,9 @@ def test_all(encoder, decoder, data, input_lang, output_lang, criterion):
                      decoder, criterion)
     return loss/len(data)
 
-def trainIters(encoder, decoder, train_data, test_data, input_lang, output_lang, learning_rate=0.01):
+def trainIters(encoder, decoder, train_data, test_data, input_lang,
+        output_lang, learning_rate=0.01, print_every=1000,
+        print_every_large=1000, n_iters=100000):
     start = time.time()
     plot_losses = []
     print_loss_total = 0  # Reset every print_every
@@ -267,8 +303,6 @@ def trainIters(encoder, decoder, train_data, test_data, input_lang, output_lang,
     decoder_optimizer = torch.optim.SGD(decoder.parameters(), lr=learning_rate)
     criterion = torch.nn.NLLLoss()
 
-    n_iters = 100000
-    print_every = 1000
     for iter in tqdm(range(1, n_iters + 1),"Training"):
         training_pair = random.choice(train_data)
         input_variable = sentence_to_variable(input_lang, training_pair[0])
@@ -283,6 +317,11 @@ def trainIters(encoder, decoder, train_data, test_data, input_lang, output_lang,
             print_loss_total = 0
             test_loss = test_all(encoder,decoder,test_data,input_lang,output_lang,criterion)
             tqdm.write('%d\t Training error: %.4f\t Testing error: %.4f' % (iter, print_loss_avg, test_loss))
+
+            if iter % print_every_large == 0:
+                tqdm.write(test_data[0][0])
+                tqdm.write(test_data[0][1])
+                tqdm.write(translate_sentence(encoder, decoder, input_lang, output_lang, test_data[0][0]))
 
 def train_test_split(data, test_percent=0.1):
     test_size = int(len(data)*test_percent)
