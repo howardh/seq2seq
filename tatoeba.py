@@ -8,7 +8,6 @@ links_file = "./data/links.csv"
 langs = ['eng', 'fra']
 pickled_file = "./data/eng-fra.pkl"
 
-#819643
 def parse_data(sentences_file, links_file, langs):
     # Get IDs of all sentences that are of the correct language
     global sentence_ids_by_lang
@@ -64,6 +63,12 @@ def get_data():
         parse_data(sentences_file, links_file, langs)
     with open(pickled_file,"rb") as f:
         return dill.load(f)
+
+def get_short_data(max_len=10):
+    data = get_data()
+    def check_len(pair):
+        return len(pair[0].split(' ')) <= max_len and len(pair[1].split(' ')) <= max_len
+    return [d for d in tqdm(data,"Filtering len <= %d"%max_len) if check_len(d)]
 
 if __name__=="__main__":
     data = parse_data(sentences_file, links_file, langs)

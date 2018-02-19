@@ -9,6 +9,8 @@ from torch.autograd import Variable
 
 import tatoeba
 
+# http://www.iro.umontreal.ca/~bengioy/cifar/NCAP2014-summerschool/slides/Ilya_LSTMs_for_Translation.pdf
+
 use_cuda = True
 
 SOS = 0
@@ -331,10 +333,14 @@ def train_test_split(data, test_percent=0.1):
     return train,test
 
 if __name__=="__main__":
-    data = tatoeba.get_data()
+    #data = tatoeba.get_data()
+    data = tatoeba.get_short_data(max_len=5)
     data = [(process_sentence("eng",p0),process_sentence("fra",p1)) for p0,p1
             in tqdm(data,"Preprocessing Sentences")]
-    train_data, test_data = train_test_split(data, 100/len(data))
+    #train_data, test_data = train_test_split(data, 100/len(data))
+    x = int(len(data)/100)
+    test_data = [data[i*x] for i in range(100)]
+    train_data = data
     eng_lang, fra_lang = compute_language(data, ["eng","fra"])
 
     hidden_size = 256
@@ -345,4 +351,5 @@ if __name__=="__main__":
         encoder = encoder.cuda()
         decoder = decoder.cuda()
 
-    trainIters(encoder, decoder, train_data, test_data, eng_lang, fra_lang, 0.01)
+    while True:
+        trainIters(encoder, decoder, train_data, test_data, eng_lang, fra_lang, 0.01)
